@@ -600,12 +600,25 @@ function renderCol(type){
       const key=String(todo.id);
       const goal=S.optGoal[key]||0;
       const cnt=S.optWeekCount[key]||0;
-      const isDone=goal>0&&cnt>=goal;
-      const badge=goal>0?`<span style="font-size:10px;font-weight:800;color:${isDone?'var(--mint-deep)':'var(--muted)'};background:${isDone?'var(--mint)':'#f0eeee'};padding:2px 7px;border-radius:10px;flex-shrink:0;">${cnt}/${goal}</span>`:'';
       const alreadyPicked=items.find(x=>x.done);
       const locked=alreadyPicked&&!todo.done;
       if(locked)div.style.opacity='0.4';
-      div.innerHTML=`<div class="todo-text">${todo.text}</div>${badge}<div class="slide-btn"></div>`;
+      let circles='';
+      // goal이 1 이상일 때만 동그라미 표시
+      const showGoal=S.optGoal[key]||0;
+      if(showGoal>0){
+        const showCnt=Math.min(cnt,showGoal);
+        circles='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
+        for(let ci=0;ci<showGoal;ci++){
+          if(ci<showCnt){
+            circles+='<span style="width:16px;height:16px;border-radius:50%;background:#3BAD84;display:inline-block;flex-shrink:0;"></span>';
+          } else {
+            circles+='<span style="width:16px;height:16px;border-radius:50%;background:transparent;border:2px solid #B2EDD8;display:inline-block;flex-shrink:0;"></span>';
+          }
+        }
+        circles+='</div>';
+      }
+      div.innerHTML=`<div class="todo-text">${todo.text}</div>${circles}<div class="slide-btn"></div>`;
     } else {
       div.innerHTML=`<div class="todo-text">${todo.text}</div><div class="slide-btn"></div>`;
     }
