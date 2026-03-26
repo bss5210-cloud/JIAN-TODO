@@ -428,10 +428,12 @@ let S=loadState();
 // calLog 없으면 초기화
 if(!S.calLog)S.calLog={};
 if(!S.weeklyByDay)S.weeklyByDay={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
-// weeklyByDay 키가 숫자가 아닌 경우 보정
 const _wbd={};
 for(let i=0;i<7;i++)_wbd[i]=S.weeklyByDay[i]||[];
 S.weeklyByDay=_wbd;
+if(!S.optGoal)S.optGoal={};
+if(!S.optWeekCount)S.optWeekCount={};
+if(!S.optWeekKey)S.optWeekKey=null;
 
 function weekKey(){
   const d=new Date();
@@ -442,17 +444,26 @@ function weekKey(){
 }
 
 function todayDow(){return new Date().getDay();}
+function getMonWeekKey(){
+  const d=new Date();const day=d.getDay();
+  const mon=new Date(d);mon.setDate(d.getDate()-(day===0?6:day-1));
+  return mon.getFullYear()+'-'+(mon.getMonth()+1)+'-'+mon.getDate();
+}
 
 function checkDayReset(){
   const t=tKey();
+  const wk=getMonWeekKey();
   if(S.lastDate&&S.lastDate!==t){
-    // 날짜 바뀌면 매일 + 오늘 요일 할일 초기화
     S.todos.forEach(x=>{if(x.type==='daily')x.done=false;});
     S.passDay=false;
-    // 요일별 done 초기화
-    for(let i=0;i<7;i++){
-      (S.weeklyByDay[i]||[]).forEach(x=>x.done=false);
-    }
+    for(let i=0;i<7;i++){(S.weeklyByDay[i]||[]).forEach(x=>x.done=false);}
+    // 선택 done도 초기화 (매일 1개 새로 고름)
+    S.todos.forEach(x=>{if(x.type==='optional')x.done=false;});
+  }
+  // 주가 바뀌면 주간 카운트 초기화
+  if(S.optWeekKey!==wk){
+    S.optWeekCount={};
+    S.optWeekKey=wk;
   }
   S.lastDate=t; save();
 }
@@ -492,11 +503,15 @@ function getPct(){
   const dow=todayDow();
   const todayWeek=S.weeklyByDay[dow]||[];
   const dailyDone=daily.filter(t=>t.done).length;
+  // 선택: 오늘 1개 선택했거나, 주간 목표 달성한 항목이 있으면 완료
   const optAnyDone=opt.some(t=>t.done);
-  const todayWeekAnyDone=todayWeek.some(t=>t.done);
+  const optGoalMet=opt.some(t=>{
+    const key=String(t.id);
+    const goal=S.optGoal[key]||0;
+    return goal>0&&(S.optWeekCount[key]||0)>=goal;
+  });
   const optTotal=opt.length>0?1:0;
-  const optDone=optAnyDone?1:0;
-  // 오늘 요일 할일: 개수만큼 분모 추가, 완료 수 반영
+  const optDone=(optAnyDone||optGoalMet)?1:0;
   const dowTotal=todayWeek.length;
   const dowDone=todayWeek.filter(t=>t.done).length;
   const total=daily.length+optTotal+dowTotal;
@@ -522,7 +537,19 @@ function renderCol(type){
   items.forEach(todo=>{
     const div=document.createElement('div');
     div.className='todo-item'+(todo.done?(isO?' done-o':' done-d'):'');
-    div.innerHTML=`<div class="todo-text">${todo.text}</div><div class="slide-btn"></div>`;
+    if(isO){
+      const key=String(todo.id);
+      const goal=S.optGoal[key]||0;
+      const cnt=S.optWeekCount[key]||0;
+      const isDone=goal>0&&cnt>=goal;
+      const badge=goal>0?`<span style="font-size:10px;font-weight:800;color:${isDone?'var(--mint-deep)':'var(--muted)'};background:${isDone?'var(--mint)':'#f0eeee'};padding:2px 7px;border-radius:10px;flex-shrink:0;">${cnt}/${goal}</span>`:'';
+      const alreadyPicked=items.find(x=>x.done);
+      const locked=alreadyPicked&&!todo.done;
+      if(locked)div.style.opacity='0.4';
+      div.innerHTML=`<div class="todo-text">${todo.text}</div>${badge}<div class="slide-btn"></div>`;
+    } else {
+      div.innerHTML=`<div class="todo-text">${todo.text}</div><div class="slide-btn"></div>`;
+    }
     div.onclick=()=>toggle(todo.id);
     c.appendChild(div);
   });
@@ -569,9 +596,18 @@ function renderAll(){
 function toggle(id){
   const t=S.todos.find(t=>t.id===id);if(!t)return;
   if(t.type==='optional'){
+    // 이미 오늘 선택한 항목이 있으면 변경 불가
+    const alreadyPicked=S.todos.find(x=>x.type==='optional'&&x.done);
+    if(alreadyPicked&&alreadyPicked.id!==id) return; // 다른 항목 선택 불가
     const wasOn=t.done;
     S.todos.forEach(x=>{if(x.type==='optional')x.done=false;});
-    if(!wasOn)t.done=true;
+    if(!wasOn){
+      t.done=true;
+      // 카운트 증가 (오늘 처음 선택)
+      const key=String(t.id);
+      if(!S.optWeekCount[key])S.optWeekCount[key]=0;
+      S.optWeekCount[key]++;
+    }
   } else {
     t.done=!t.done;
   }
@@ -1062,6 +1098,13 @@ function doImport(){
   } catch(e) {
     alert('데이터 형식이 잘못됐어요. 다시 확인해주세요.');
   }
+}
+
+function changeGoal(id,delta){
+  const key=String(id);
+  if(!S.optGoal[key])S.optGoal[key]=0;
+  S.optGoal[key]=Math.max(0,S.optGoal[key]+delta);
+  save();renderDL();renderCol('optional');
 }
 
 function boom(count=3){
