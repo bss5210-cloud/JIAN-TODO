@@ -460,13 +460,8 @@
 const SUPABASE_URL = 'https://yqqzcmzxqzwhlxvgfywg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DYdLzleRhnPQDr5uD-E_5Q_BJyM4vO_';
 
-// 기기 고유 ID (localStorage에 저장)
-function getUserId(){
-  let uid = localStorage.getItem('jian_uid');
-  if(!uid){ uid = 'jian_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); localStorage.setItem('jian_uid', uid); }
-  return uid;
-}
-const USER_ID = getUserId();
+// 고정 user_id - 어디서 열어도 같은 데이터
+const USER_ID = 'jian';
 
 let curPage=0,eType='daily',eId=null,dSrc=null;
 let saveTimer=null;
