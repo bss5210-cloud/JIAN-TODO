@@ -269,8 +269,15 @@
       </div>
       <div class="top-date" id="top-date"></div>
     </div>
-    <!-- 하트 5개 -->
-    <div id="hearts-wrap" style="display:flex;align-items:center;gap:6px;margin-left:16px;flex-shrink:0;"></div>
+    <!-- 하트 1개 -->
+    <div id="hearts-wrap" style="display:flex;align-items:center;gap:4px;margin-left:16px;flex-shrink:0;">
+      <svg id="heart-single" viewBox="0 0 72 72" width="50" height="50" xmlns="http://www.w3.org/2000/svg">
+        <defs><clipPath id="hfc"><rect id="hfr" x="0" y="72" width="72" height="72"/></clipPath></defs>
+        <path d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="none" stroke="#FFB3C6" stroke-width="3"/>
+        <path id="hf" d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="#F4A0B5" clip-path="url(#hfc)" opacity="0"/>
+        <text id="hpt" x="36" y="44" text-anchor="middle" font-size="14" font-weight="800" fill="#E05A7A" font-family="Nunito,sans-serif">0%</text>
+      </svg>
+    </div>
     <div class="top-right">
       <div class="top-pct" id="top-pct"></div>
       <div class="top-bar-progress"><div class="top-bar-fill" id="tbf"></div></div>
@@ -449,32 +456,76 @@
 </div>
 
 <script>
-const LS_KEY='jian_todo_v2';
-let curPage=0,eType='daily',eId=null,dSrc=null;
+// Supabase 설정
+const SUPABASE_URL = 'https://yqqzcmzxqzwhlxvgfywg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DYdLzleRhnPQDr5uD-E_5Q_BJyM4vO_';
 
-function loadState(){
-  try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}
-  return{todos:[
+// 기기 고유 ID (localStorage에 저장)
+function getUserId(){
+  let uid = localStorage.getItem('jian_uid');
+  if(!uid){ uid = 'jian_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); localStorage.setItem('jian_uid', uid); }
+  return uid;
+}
+const USER_ID = getUserId();
+
+let curPage=0,eType='daily',eId=null,dSrc=null;
+let saveTimer=null;
+
+function defaultState(){
+  return {todos:[
     {id:1,text:'양치하기',type:'daily',done:false},
     {id:2,text:'수학 공부하기',type:'daily',done:false},
     {id:3,text:'독서 20분',type:'daily',done:false},
     {id:4,text:'산책하기',type:'optional',done:false},
     {id:5,text:'방 청소하기',type:'optional',done:false},
-    {id:6,text:'주간 할 일 예시',type:'weekly',done:false},
-  ],cal:{},yr:new Date().getFullYear(),mo:new Date().getMonth(),passDay:false,lastDate:null,weekKey:null};
+  ],cal:{},yr:new Date().getFullYear(),mo:new Date().getMonth(),
+  passDay:false,lastDate:null,weekKey:null,
+  weeklyByDay:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]},
+  optGoal:{},optWeekCount:{},optWeekKey:null,calLog:{}};
 }
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}}
-let S=loadState();
 
-// calLog 없으면 초기화
-if(!S.calLog)S.calLog={};
-if(!S.weeklyByDay)S.weeklyByDay={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
-const _wbd={};
-for(let i=0;i<7;i++)_wbd[i]=S.weeklyByDay[i]||[];
-S.weeklyByDay=_wbd;
-if(!S.optGoal)S.optGoal={};
-if(!S.optWeekCount)S.optWeekCount={};
-if(!S.optWeekKey)S.optWeekKey=null;
+// Supabase에서 데이터 로드
+async function loadFromSupabase(){
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/jian_todo?user_id=eq.${USER_ID}&order=updated_at.desc&limit=1`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const rows = await res.json();
+    if(rows && rows.length > 0) return rows[0].data;
+  } catch(e){ console.error('load error:', e); }
+  return null;
+}
+
+// Supabase에 데이터 저장 (upsert)
+async function saveToSupabase(){
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/jian_todo`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({user_id: USER_ID, data: S, updated_at: new Date().toISOString()})
+    });
+  } catch(e){ console.error('save error:', e); }
+}
+
+function save(){
+  // localStorage 백업
+  try{localStorage.setItem('jian_todo_v2', JSON.stringify(S));}catch(e){}
+  // Supabase 저장 (딜레이로 빈번한 저장 방지)
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToSupabase, 1000);
+}
+
+let S = defaultState();
+
+// 초기화는 initApp()에서 처리
 
 function weekKey(){
   const d=new Date();
@@ -546,46 +597,13 @@ document.getElementById('sw').addEventListener('touchend',e=>{
   if(dx>50&&curPage===1)goPage(0);
 },{passive:true});
 
-function heartSvg5(filled, pct, isLast){
-  const id='hh'+Math.random().toString(36).substr(2,4);
-  const cy=(64*(1-filled)).toFixed(1);
-  const pctText = isLast ? `<text x="36" y="100" text-anchor="middle" font-size="16" font-weight="800" fill="#E05A7A" font-family="Nunito,sans-serif">${Math.round(pct)}%</text>` : '';
-  if(filled===0){
-    return`<svg width="44" height="44" viewBox="0 0 72 72"><path d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="none" stroke="#FFD6E4" stroke-width="4"/></svg>`;
-  }
-  if(filled>=1){
-    return`<svg width="44" height="44" viewBox="0 0 72 72"><path d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="#F4A0B5" stroke="#FFB3C6" stroke-width="2"/></svg>`;
-  }
-  return`<svg width="44" height="44" viewBox="0 0 72 72">
-    <defs><clipPath id="${id}"><rect x="0" y="${cy}" width="72" height="72"/></clipPath></defs>
-    <path d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="none" stroke="#FFD6E4" stroke-width="4"/>
-    <path d="M36 64 L8 38 C2 32 2 22 8 16 C14 10 24 10 30 16 L36 22 L42 16 C48 10 58 10 64 16 C70 22 70 32 64 38 Z" fill="#F4A0B5" clip-path="url(#${id})"/>
-  </svg>`;
-}
-
 function updHeart(pct){
-  const wrap=document.getElementById('hearts-wrap');
-  if(!wrap)return;
-  wrap.innerHTML='';
-  for(let i=0;i<5;i++){
-    const threshold=(i+1)*20;
-    const prev=i*20;
-    let filled=0;
-    if(pct>=threshold) filled=1;
-    else if(pct>prev) filled=(pct-prev)/20;
-    // 현재 채워지고 있는 하트에 % 표시
-    const isActive = (pct>prev && pct<=threshold) || (i===4 && pct>=100);
-    const div=document.createElement('div');
-    div.style.position='relative';
-    div.innerHTML=heartSvg5(filled,pct,isActive);
-    if(isActive){
-      const lbl=document.createElement('div');
-      lbl.textContent=Math.round(pct)+'%';
-      lbl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;font-weight:900;color:#E05A7A;font-family:Nunito,sans-serif;pointer-events:none;white-space:nowrap;';
-      div.appendChild(lbl);
-    }
-    wrap.appendChild(div);
-  }
+  const r=document.getElementById('hfr');
+  const hf=document.getElementById('hf');
+  const hpt=document.getElementById('hpt');
+  if(r) r.setAttribute('y',72-(72*pct/100));
+  if(hf) hf.setAttribute('opacity',pct===0?'0':'1');
+  if(hpt) hpt.textContent=Math.round(pct)+'%';
   document.getElementById('tbf').style.width=pct+'%';
 }
 const tKey=()=>{const d=new Date();return`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;};
@@ -647,12 +665,14 @@ function renderCol(type){
       const key=String(todo.id);
       const goal=S.optGoal[key]||0;
       const cnt=S.optWeekCount[key]||0;
+      const showGoal=goal;
       const alreadyPicked=items.find(x=>x.done);
-      const locked=alreadyPicked&&!todo.done;
-      if(locked)div.style.opacity='0.4';
+      const goalMet=showGoal>0&&cnt>=showGoal;
+      const locked=(alreadyPicked&&!todo.done)||goalMet;
+      if(locked&&!goalMet)div.style.opacity='0.4';
+      if(goalMet)div.style.opacity='0.6';
       let circles='';
       // goal이 1 이상일 때만 동그라미 표시
-      const showGoal=S.optGoal[key]||0;
       if(showGoal>0){
         const showCnt=Math.min(cnt,showGoal);
         circles='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
@@ -718,6 +738,11 @@ function toggle(id){
     // 이미 오늘 선택한 항목이 있으면 변경 불가
     const alreadyPicked=S.todos.find(x=>x.type==='optional'&&x.done);
     if(alreadyPicked&&alreadyPicked.id!==id) return; // 다른 항목 선택 불가
+    // 주간 목표 달성한 항목은 선택 불가
+    const _key=String(t.id);
+    const _goal=S.optGoal[_key]||0;
+    const _cnt=S.optWeekCount[_key]||0;
+    if(_goal>0&&_cnt>=_goal&&!t.done) return;
     const wasOn=t.done;
     S.todos.forEach(x=>{if(x.type==='optional')x.done=false;});
     if(!wasOn){
@@ -726,6 +751,10 @@ function toggle(id){
       const key=String(t.id);
       if(!S.optWeekCount[key])S.optWeekCount[key]=0;
       S.optWeekCount[key]++;
+    } else {
+      // 선택 취소 시 카운트 감소
+      const key=String(t.id);
+      if(S.optWeekCount[key]>0)S.optWeekCount[key]--;
     }
   } else {
     t.done=!t.done;
@@ -1278,7 +1307,41 @@ function setDate(){
 document.getElementById('cp').onclick=()=>{S.mo--;if(S.mo<0){S.mo=11;S.yr--;}save();renderCal();if(curPage===1)updateCalStats();};
 document.getElementById('cn').onclick=()=>{S.mo++;if(S.mo>11){S.mo=0;S.yr++;}save();renderCal();if(curPage===1)updateCalStats();};
 
-checkDayReset();setDate();renderAll();renderCal();updHeart(0);
+// 앱 시작 - Supabase에서 로드
+async function initApp(){
+  // 로딩 표시
+  document.getElementById('top-pct').textContent = '로딩 중...';
+
+  // Supabase에서 데이터 로드 시도
+  const remoteData = await loadFromSupabase();
+  if(remoteData){
+    S = remoteData;
+  } else {
+    // 없으면 localStorage 확인
+    try{
+      const local = localStorage.getItem('jian_todo_v2');
+      if(local) S = JSON.parse(local);
+    }catch(e){}
+  }
+
+  // 필드 초기화 보정
+  if(!S.calLog) S.calLog={};
+  if(!S.weeklyByDay) S.weeklyByDay={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+  const _wbd={};
+  for(let i=0;i<7;i++) _wbd[i]=S.weeklyByDay[i]||[];
+  S.weeklyByDay=_wbd;
+  if(!S.optGoal) S.optGoal={};
+  if(!S.optWeekCount) S.optWeekCount={};
+  if(!S.optWeekKey) S.optWeekKey=null;
+  if(!S.cal) S.cal={};
+
+  checkDayReset();
+  setDate();
+  renderAll();
+  renderCal();
+  updHeart(0);
+}
+initApp();
 </script>
 </body>
 </html>
