@@ -295,17 +295,10 @@
               <span class="col-title-txt">매일</span>
               <div class="col-right">
                 <span class="col-badge d" id="db">0/0</span>
-                <button class="col-btn d" onclick="toggleAddForm('daily')">+ 추가</button>
                 <button class="col-btn d" onclick="openEdit('daily')">편집</button>
               </div>
             </div>
-            <div class="col-add-form" id="af-daily">
-              <input class="col-add-input" id="ai-daily" placeholder="할 일 입력..." maxlength="20"/>
-              <div class="col-add-row2">
-                <button class="col-add-ok d" onclick="confirmAdd('daily')">추가</button>
-                <button class="col-add-cancel" onclick="toggleAddForm('daily')">취소</button>
-              </div>
-            </div>
+
             <div class="todo-list" id="ld"></div>
           </div>
 
@@ -314,17 +307,10 @@
               <span class="col-title-txt">선택</span>
               <div class="col-right">
                 <span class="col-badge o" id="ob">0/0</span>
-                <button class="col-btn o" onclick="toggleAddForm('optional')">+ 추가</button>
                 <button class="col-btn o" onclick="openEdit('optional')">편집</button>
               </div>
             </div>
-            <div class="col-add-form" id="af-optional">
-              <input class="col-add-input o" id="ai-optional" placeholder="할 일 입력..." maxlength="20"/>
-              <div class="col-add-row2">
-                <button class="col-add-ok o" onclick="confirmAdd('optional')">추가</button>
-                <button class="col-add-cancel" onclick="toggleAddForm('optional')">취소</button>
-              </div>
-            </div>
+
             <div class="todo-list" id="lo"></div>
           </div>
 
@@ -366,7 +352,7 @@
 
   <!-- PASS DAY -->
   <div class="pass-day-bar">
-    <button onclick="openIO()" style="border:1.5px solid var(--pink-light);background:#FFF5F8;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--pink-deep);font-family:'Nunito',sans-serif;cursor:pointer;">데이터</button>
+
     <div class="pass-day-label" style="flex:1;text-align:right;">PASS DAY</div>
     <div class="pass-toggle" id="pass-toggle" onclick="togglePassDay()"></div>
   </div>
@@ -412,35 +398,7 @@
   </div>
 </div>
 
-<!-- 내보내기/가져오기 모달 -->
-<div class="io-overlay" id="io-overlay" onclick="if(event.target===this)closeIO()">
-  <div class="io-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div class="io-title">📤 데이터 내보내기 / 가져오기</div>
-      <button class="io-btn close" style="flex:0;padding:5px 10px;" onclick="closeIO()">✕</button>
-    </div>
-    <div class="io-notice">
-      ✅ <b>내보내기</b>: 아래 텍스트를 복사해서 다른 기기에서 붙여넣기<br>
-      ✅ <b>가져오기</b>: 다른 기기에서 복사한 텍스트를 붙여넣고 가져오기 클릭
-    </div>
-    <hr class="io-divider"/>
-    <div>
-      <div class="io-section-title">내 데이터 (복사해서 다른 기기에 붙여넣기)</div>
-      <textarea class="io-textarea" id="io-export-text" readonly></textarea>
-      <div class="io-btn-row" style="margin-top:8px;">
-        <button class="io-btn copy" onclick="copyExport()">📋 복사하기</button>
-      </div>
-    </div>
-    <hr class="io-divider"/>
-    <div>
-      <div class="io-section-title">가져오기 (다른 기기에서 복사한 내용 붙여넣기)</div>
-      <textarea class="io-textarea" id="io-import-text" placeholder="여기에 붙여넣기..."></textarea>
-      <div class="io-btn-row" style="margin-top:8px;">
-        <button class="io-btn import" onclick="doImport()">📥 가져오기</button>
-      </div>
-    </div>
-  </div>
-</div>
+
 
 <!-- 날짜 상세 팝업 -->
 <div class="day-popup-overlay" id="day-overlay" onclick="closeDayPopup(event)">
