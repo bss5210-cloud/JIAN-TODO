@@ -550,7 +550,11 @@ function updHeart(pct){
   const hf=document.getElementById('hf');
   const hpt=document.getElementById('hpt');
   if(r) r.setAttribute('y',72-(72*pct/100));
-  if(hf) hf.setAttribute('opacity',pct===0?'0':'1');
+  if(hf){
+    hf.setAttribute('opacity',pct===0?'0':'1');
+    // passDay면 연한핑크, 아니면 일반 핑크
+    hf.setAttribute('fill', S.passDay?'#FFD6E4':'#F4A0B5');
+  }
   if(hpt) hpt.textContent=Math.round(pct)+'%';
   document.getElementById('tbf').style.width=pct+'%';
 }
@@ -1217,7 +1221,8 @@ function updateCalStats(){
   let heartDays=0;
   for(let d=1;d<=totalDays;d++){
     const k=`${yr}-${mo+1}-${d}`;
-    if(S.cal[k]>0) heartDays++;
+    const _isPass=S.calLog&&S.calLog[k]&&S.calLog[k].pass;
+    if((S.cal[k]>=100)||_isPass) heartDays++;
   }
   document.getElementById('top-pct').textContent=`${heartDays} / ${totalDays}일`;
   document.getElementById('tbf').style.width=(heartDays/totalDays*100)+'%';
