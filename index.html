@@ -1292,7 +1292,10 @@ function setDate(){
   document.getElementById('top-date').textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 }
 
-document.getElementById('cp').onclick=()=>{S.mo--;if(S.mo<0){S.mo=11;S.yr--;}save();renderCal();if(curPage===1)updateCalStats();};
+document.getElementById('cp').onclick=()=>{
+  if(S.yr===2026&&S.mo===2) return; // 2026년 3월(mo=2) 이전으로 못 감
+  S.mo--;if(S.mo<0){S.mo=11;S.yr--;}save();renderCal();if(curPage===1)updateCalStats();
+};
 document.getElementById('cn').onclick=()=>{S.mo++;if(S.mo>11){S.mo=0;S.yr++;}save();renderCal();if(curPage===1)updateCalStats();};
 
 // 앱 시작 - Supabase에서 로드
