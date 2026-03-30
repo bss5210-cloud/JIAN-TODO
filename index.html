@@ -452,7 +452,7 @@ async function loadFromSupabase(){
   return null;
 }
 
-// Supabase에 데이터 저장 (upsert)
+// Supabase에 데이터 저장 (upsert - user_id 기준)
 async function saveToSupabase(){
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/jian_todo`, {
@@ -461,7 +461,7 @@ async function saveToSupabase(){
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
       body: JSON.stringify({user_id: USER_ID, data: S, updated_at: new Date().toISOString()})
     });
@@ -729,8 +729,7 @@ function confirmAdd(type){
   inp.value='';document.getElementById('af-'+type).classList.remove('open');
   save();renderAll();
 }
-document.getElementById('ai-daily').onkeydown=e=>{if(e.key==='Enter')confirmAdd('daily');};
-document.getElementById('ai-optional').onkeydown=e=>{if(e.key==='Enter')confirmAdd('optional');};
+
 
 // 요일별 설정 패널
 let selectedDow=new Date().getDay();
