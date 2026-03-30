@@ -516,7 +516,22 @@ function checkDayReset(){
     S.optWeekCount={};
     S.optWeekKey=wk;
   }
-  S.lastDate=t; save();
+  S.lastDate=t;
+  // 오늘 S.cal 값을 실제 done 상태로 재계산해서 덮어씀
+  // (이전에 optGoalMet 버그로 잘못 저장된 값 수정)
+  {
+    const daily=S.todos.filter(x=>x.type==='daily');
+    const opt=S.todos.filter(x=>x.type==='optional');
+    const dow=new Date().getDay();
+    const todayWeek=S.weeklyByDay[dow]||[];
+    const dailyDone=daily.filter(x=>x.done).length;
+    const optDone=opt.some(x=>x.done)?1:0;
+    const optTotal=opt.length>0?1:0;
+    const dowDone=todayWeek.filter(x=>x.done).length;
+    const total=daily.length+optTotal+todayWeek.length;
+    S.cal[t]=total>0?(dailyDone+optDone+dowDone)/total*100:0;
+  }
+  save();
 }
 
 function togglePassDay(){
