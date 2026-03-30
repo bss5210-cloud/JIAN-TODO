@@ -1319,6 +1319,9 @@ async function initApp(){
   }catch(e){}
   initFields();
   checkDayReset();
+  // 달력은 항상 현재 월로
+  S.yr = new Date().getFullYear();
+  S.mo = new Date().getMonth();
   setDate();
   renderAll();
   renderCal();
