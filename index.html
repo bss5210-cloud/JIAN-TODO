@@ -992,7 +992,7 @@ function openDayPopup(k,yr,mo,d){
 
 function renderDayPopup(k,yr,mo,d){
   // 편집 중엔 tempLog, 스냅샷 보기엔 S.calLog 사용
-  const log = (tempLog && tempLog.snapshot===false && !isFuture(k)) ? tempLog : S.calLog[k];
+  const log = (tempLog && !isFuture(k)) ? tempLog : (S.calLog[k] || {daily:[],optional:[],weekly:[],pass:false,snapshot:false});
   const pct=S.cal[k];
   const mn=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   document.getElementById('dp-date').textContent=yr+'년 '+mn[mo-1]+' '+d+'일';
@@ -1003,7 +1003,7 @@ function renderDayPopup(k,yr,mo,d){
   // snapshot=false/없음 + 과거/오늘 → 편집 모드 (저장 버튼 있음)
   // 미래 → 보기 모드 (버튼 없음)
   const isSnap = !!log.snapshot;
-  const editable = !isSnap && !isFuture(k);
+  const editable = !isFuture(k);
 
   const body=document.getElementById('dp-body');body.innerHTML='';
   const action=document.getElementById('dp-action');action.innerHTML='';
@@ -1020,13 +1020,9 @@ function renderDayPopup(k,yr,mo,d){
 
   if(log.pass){
     const p=document.createElement('div');p.className='dp-pass';p.textContent='🌸 오늘 하루 패스했어요';body.appendChild(p);
-    // 저장 버튼은 보여야 함
-    if(!isSnap&&isPast(k)){
+    if(!isFuture(k)&&!isToday(k)){
       action.style.display='block';
       action.innerHTML=`<div class="dp-action-row"><button class="dp-save-btn" onclick="saveDayEdit('${k}',${yr},${mo},${d})">저장</button></div>`;
-    } else if(isSnap&&!isToday(k)&&!isFuture(k)){
-      action.style.display='block';
-      action.innerHTML=`<div class="dp-action-row"><button class="dp-edit-btn" onclick="unlockDayEdit('${k}',${yr},${mo},${d})">✏️ 수정하기</button></div>`;
     } else { action.style.display='none'; }
     return;
   }
