@@ -1260,23 +1260,7 @@ document.getElementById('cp').onclick=()=>{S.mo--;if(S.mo<0){S.mo=11;S.yr--;}sav
 document.getElementById('cn').onclick=()=>{S.mo++;if(S.mo>11){S.mo=0;S.yr++;}save();renderCal();if(curPage===1)updateCalStats();};
 
 // 앱 시작 - Supabase에서 로드
-async function initApp(){
-  // 로딩 표시
-  document.getElementById('top-pct').textContent = '로딩 중...';
-
-  // Supabase에서 데이터 로드 시도
-  const remoteData = await loadFromSupabase();
-  if(remoteData){
-    S = remoteData;
-  } else {
-    // 없으면 localStorage 확인
-    try{
-      const local = localStorage.getItem('jian_todo_v2');
-      if(local) S = JSON.parse(local);
-    }catch(e){}
-  }
-
-  // 필드 초기화 보정
+function initFields(){
   if(!S.calLog) S.calLog={};
   if(!S.weeklyByDay) S.weeklyByDay={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
   const _wbd={};
@@ -1286,12 +1270,31 @@ async function initApp(){
   if(!S.optWeekCount) S.optWeekCount={};
   if(!S.optWeekKey) S.optWeekKey=null;
   if(!S.cal) S.cal={};
+}
 
+async function initApp(){
+  // 1. localStorage로 먼저 빠르게 렌더링
+  try{
+    const local = localStorage.getItem('jian_todo_v2');
+    if(local) S = JSON.parse(local);
+  }catch(e){}
+  initFields();
   checkDayReset();
   setDate();
   renderAll();
   renderCal();
   updHeart(0);
+
+  // 2. 백그라운드에서 Supabase 로드 후 업데이트
+  const remoteData = await loadFromSupabase();
+  if(remoteData){
+    S = remoteData;
+    initFields();
+    checkDayReset();
+    renderAll();
+    renderCal();
+    updHeart(0);
+  }
 }
 initApp();
 </script>
