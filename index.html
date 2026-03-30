@@ -980,12 +980,14 @@ function openDayPopup(k,yr,mo,d){
     S.calLog[k]={
       daily:S.todos.filter(t=>t.type==='daily').map(t=>({text:t.text,done:false})),
       optional:S.todos.filter(t=>t.type==='optional').map(t=>({text:t.text,done:false})),
-      pass:false,
-      snapshot:false
+      weekly:[],pass:false,snapshot:false
     };
   }
+  // pass 필드 없으면 추가
+  if(S.calLog[k].pass===undefined) S.calLog[k].pass=false;
   // 편집 시작 시 임시 복사본 만들기
   tempLog = JSON.parse(JSON.stringify(S.calLog[k]));
+  tempLog.snapshot=false;
   renderDayPopup(k,yr,mo,d);
   document.getElementById('day-overlay').classList.add('open');
 }
