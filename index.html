@@ -1330,6 +1330,9 @@ async function initApp(){
     S = remoteData;
     initFields();
     checkDayReset();
+    // 달력은 항상 현재 월로 시작
+    S.yr = new Date().getFullYear();
+    S.mo = new Date().getMonth();
     // localStorage에 캐시 저장 (다음 로딩 빠르게)
     try{localStorage.setItem('jian_todo_v2', JSON.stringify(S));}catch(e){}
     renderAll();
