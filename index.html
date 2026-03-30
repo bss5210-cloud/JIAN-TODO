@@ -516,15 +516,10 @@ function checkDayReset(){
 function togglePassDay(){
   S.passDay=!S.passDay;
   if(S.passDay){
-    // 매일 할일 전체 완료
-    S.todos.forEach(x=>{if(x.type==='daily')x.done=true;});
-    // 요일 할일 전체 완료
-    const dow=todayDow();
-    (S.weeklyByDay[dow]||[]).forEach(x=>x.done=true);
     boom(6);
   } else {
-    // 다시 끄면 매일+요일 초기화
-    S.todos.forEach(x=>{if(x.type==='daily')x.done=false;});
+    // 끄면 모든 체크 초기화
+    S.todos.forEach(x=>x.done=false);
     const dow=todayDow();
     (S.weeklyByDay[dow]||[]).forEach(x=>x.done=false);
   }
@@ -562,19 +557,7 @@ function updHeart(pct){
 const tKey=()=>{const d=new Date();return`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;};
 
 function getPct(){
-  if(S.passDay){
-    // passDay: 매일+요일은 완료, 선택만 별도 계산
-    const opt=S.todos.filter(t=>t.type==='optional');
-    const dow=todayDow();
-    const todayWeek=S.weeklyByDay[dow]||[];
-    const daily=S.todos.filter(t=>t.type==='daily');
-    const optAnyDone=opt.some(t=>t.done);
-    const optTotal=opt.length>0?1:0;
-    const optDone=optAnyDone?1:0;
-    const total=daily.length+optTotal+todayWeek.length;
-    if(!total)return 0;
-    return(daily.length+optDone+todayWeek.length)/total*100;
-  }
+  if(S.passDay) return 100;
   const daily=S.todos.filter(t=>t.type==='daily');
   const opt=S.todos.filter(t=>t.type==='optional');
   const dow=todayDow();
@@ -596,8 +579,10 @@ function getPct(){
   return(dailyDone+optDone+dowDone)/total*100;
 }
 
-function hSvg(pct){
-  if(pct===0)return`<svg class="heart-svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="#FFB3C6" stroke-width="2"/></svg>`;
+function hSvg(pct, isPass){
+  const passColor='#FFD6E4'; // 연한핑크 (패스데이용)
+  if(pct===0&&!isPass)return`<svg class="heart-svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="#FFB3C6" stroke-width="2"/></svg>`;
+  if(isPass)return`<svg class="heart-svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="${passColor}" stroke="${passColor}" stroke-width="1"/></svg>`;
   const op=pct<30?0.45:pct<60?0.65:pct<100?0.85:1;
   const id='h'+Math.random().toString(36).substr(2,5);
   const cy=(24*(1-pct/100)).toFixed(2);
@@ -621,7 +606,7 @@ function renderCol(type){
       const showGoal=goal;
       const alreadyPicked=items.find(x=>x.done);
       const goalMet=showGoal>0&&cnt>=showGoal;
-      const locked=(alreadyPicked&&!todo.done)||goalMet;
+      const locked=S.passDay||(alreadyPicked&&!todo.done)||goalMet;
       if(locked&&!goalMet)div.style.opacity='0.4';
       if(goalMet)div.style.opacity='0.6';
       let circles='';
@@ -642,7 +627,8 @@ function renderCol(type){
     } else {
       div.innerHTML=`<div class="todo-text">${todo.text}</div><div class="slide-btn"></div>`;
     }
-    div.onclick=()=>toggle(todo.id);
+    if(!S.passDay) div.onclick=()=>toggle(todo.id);
+    else div.style.opacity='0.5';
     c.appendChild(div);
   });
 }
@@ -949,8 +935,10 @@ function renderCal(){
     const cell=document.createElement('div');const k=`${yr}-${mo+1}-${d}`;
     const isTd=td.getFullYear()===yr&&td.getMonth()===mo&&td.getDate()===d;
     cell.className='cal-cell'+(isTd?' today':'')+' clickable';
-    const pct=S.cal[k];if(pct>=100)dd++;
-    cell.innerHTML=`<div class="day-num">${d}</div>${hSvg(pct!==undefined?pct:0)}`;
+    const pct=S.cal[k];
+    const isPassDay=S.calLog&&S.calLog[k]&&S.calLog[k].pass;
+    if(pct>=100||isPassDay)dd++;
+    cell.innerHTML=`<div class="day-num">${d}</div>${hSvg(pct!==undefined?pct:0, isPassDay)}`;
     cell.onclick=()=>openDayPopup(k,yr,mo+1,d);
     g.appendChild(cell);
   }
