@@ -337,7 +337,7 @@
       <div class="page">
         <div class="cal-card">
           <div class="cal-header">
-            <button class="cal-nav" id="cp">‹</button>
+            <button class="cal-nav" id="cp" style="opacity:0.3;">‹</button>
             <div class="cal-month-lbl" id="cml"></div>
             <button class="cal-nav" id="cn">›</button>
           </div>
@@ -953,6 +953,9 @@ function renderCal(){
     g.appendChild(cell);
   }
   document.getElementById('ddn').textContent=dd;
+  // 2026년 3월이면 이전 버튼 비활성화
+  const cpBtn=document.getElementById('cp');
+  if(cpBtn) cpBtn.style.opacity=(S.yr===2026&&S.mo===2)?'0.2':'1';
 }
 
 let currentDayKey=null;
@@ -1293,8 +1296,12 @@ function setDate(){
 }
 
 document.getElementById('cp').onclick=()=>{
-  if(S.yr===2026&&S.mo===2) return; // 2026년 3월(mo=2) 이전으로 못 감
-  S.mo--;if(S.mo<0){S.mo=11;S.yr--;}save();renderCal();if(curPage===1)updateCalStats();
+  if(S.yr===2026&&S.mo===2) return;
+  if(S.yr<2026) return;
+  if(S.yr===2026&&S.mo<=2) return;
+  S.mo--;if(S.mo<0){S.mo=11;S.yr--;}
+  // yr/mo 저장하지 않음 (Supabase에 영향 없게)
+  renderCal();if(curPage===1)updateCalStats();
 };
 document.getElementById('cn').onclick=()=>{S.mo++;if(S.mo>11){S.mo=0;S.yr++;}save();renderCal();if(curPage===1)updateCalStats();};
 
