@@ -1291,6 +1291,8 @@ async function initApp(){
     S = remoteData;
     initFields();
     checkDayReset();
+    // localStorage에 캐시 저장 (다음 로딩 빠르게)
+    try{localStorage.setItem('jian_todo_v2', JSON.stringify(S));}catch(e){}
     renderAll();
     renderCal();
     updHeart(0);
