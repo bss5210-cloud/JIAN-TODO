@@ -1,0 +1,25 @@
+{
+  "name": "Jian's To do List",
+  "short_name": "JIAN TODO",
+  "description": "지안의 할일 관리 앱",
+  "start_url": "/JIAN-TODO/",
+  "scope": "/JIAN-TODO/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#333333",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
