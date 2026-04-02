@@ -440,7 +440,7 @@ function defaultState(){
   ],cal:{},yr:new Date().getFullYear(),mo:new Date().getMonth(),
   passDay:false,lastDate:null,weekKey:null,
   weeklyByDay:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]},
-  optGoal:{},optWeekCount:{},optWeekKey:null,calLog:{}};
+  optGoal:{},optWeekCount:{},optWeekKey:null,optPickedDate:{},calLog:{}};
 }
 
 // Supabase에서 데이터 로드
@@ -709,14 +709,24 @@ function toggle(id){
     S.todos.forEach(x=>{if(x.type==='optional')x.done=false;});
     if(!wasOn){
       t.done=true;
-      // 카운트 증가 (오늘 처음 선택)
+      // 오늘 이 항목을 처음 선택하는 경우에만 카운트 증가
       const key=String(t.id);
-      if(!S.optWeekCount[key])S.optWeekCount[key]=0;
-      S.optWeekCount[key]++;
+      const today=tKey();
+      if(!S.optPickedDate) S.optPickedDate={};
+      if(S.optPickedDate[key]!==today){
+        if(!S.optWeekCount[key])S.optWeekCount[key]=0;
+        S.optWeekCount[key]++;
+        S.optPickedDate[key]=today;
+      }
     } else {
-      // 선택 취소 시 카운트 감소
+      // 선택 취소 시: 오늘 카운트한 것만 되돌림
       const key=String(t.id);
-      if(S.optWeekCount[key]>0)S.optWeekCount[key]--;
+      const today=tKey();
+      if(!S.optPickedDate) S.optPickedDate={};
+      if(S.optPickedDate[key]===today){
+        if(S.optWeekCount[key]>0)S.optWeekCount[key]--;
+        delete S.optPickedDate[key];
+      }
     }
   } else {
     t.done=!t.done;
@@ -1328,6 +1338,7 @@ function initFields(){
   if(!S.optGoal) S.optGoal={};
   if(!S.optWeekCount) S.optWeekCount={};
   if(!S.optWeekKey) S.optWeekKey=null;
+  if(!S.optPickedDate) S.optPickedDate={};
   if(!S.cal) S.cal={};
 }
 
