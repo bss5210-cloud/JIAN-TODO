@@ -1174,6 +1174,7 @@ function unlockDayEdit(k,yr,mo,d){
 }
 
 function saveDayEdit(k,yr,mo,d){
+  const prevLog=S.calLog[k]?JSON.parse(JSON.stringify(S.calLog[k])):null;
   if(tempLog){
     tempLog.snapshot=true;
     S.calLog[k]=JSON.parse(JSON.stringify(tempLog));
@@ -1181,17 +1182,46 @@ function saveDayEdit(k,yr,mo,d){
   }
   const log=S.calLog[k];
   if(log.pass){
-    S.cal[k]=100; // PASS DAY는 100%
+    S.cal[k]=100;
   } else {
-    const daily=log.daily||[];const opt=log.optional||[];const wk=log.weekly||[];
+    const daily=log.daily||[];const opt=log.optional||[];const wkItems=log.weekly||[];
     const dailyDone=daily.filter(t=>t.done).length;
     const optAny=opt.some(t=>t.done);
     const optTotal=opt.length>0?1:0;
-    const wkDone=wk.filter(t=>t.done).length;
-    const total=daily.length+optTotal+wk.length;
+    const wkDone=wkItems.filter(t=>t.done).length;
+    const total=daily.length+optTotal+wkItems.length;
     S.cal[k]=total>0?(dailyDone+(optAny?1:0)+wkDone)/total*100:0;
   }
+  // 이번 주 범위인지 확인 후 optWeekCount 업데이트
+  const wkKey=getMonWeekKey();
+  const kParts=k.split('-');
+  const kDate=new Date(parseInt(kParts[0]),parseInt(kParts[1])-1,parseInt(kParts[2]));
+  const wkParts=wkKey.split('-');
+  const wkDate=new Date(parseInt(wkParts[0]),parseInt(wkParts[1])-1,parseInt(wkParts[2]));
+  const wkEnd=new Date(wkDate);wkEnd.setDate(wkDate.getDate()+6);
+  const isThisWeek=kDate>=wkDate&&kDate<=wkEnd;
+  if(isThisWeek&&!log.pass){
+    if(!S.optPickedDate)S.optPickedDate={};
+    const opt=log.optional||[];
+    const prevOpt=(prevLog&&prevLog.optional)||[];
+    opt.forEach((t,i)=>{
+      const todo=S.todos.find(x=>x.type==='optional'&&x.text===t.text);
+      if(!todo)return;
+      const key=String(todo.id);
+      const wasOn=prevOpt[i]&&prevOpt[i].done;
+      const isOn=t.done;
+      if(!S.optWeekCount[key])S.optWeekCount[key]=0;
+      if(isOn&&!wasOn){
+        S.optWeekCount[key]++;
+        S.optPickedDate[key]=k;
+      } else if(!isOn&&wasOn){
+        if(S.optWeekCount[key]>0)S.optWeekCount[key]--;
+        if(S.optPickedDate[key]===k)delete S.optPickedDate[key];
+      }
+    });
+  }
   save();
+  renderCol('optional');
   renderDayPopup(k,yr,mo,d);
   renderCal();
 }
