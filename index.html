@@ -355,9 +355,12 @@
             <div class="cal-day-lbl">수</div><div class="cal-day-lbl">목</div><div class="cal-day-lbl">금</div><div class="cal-day-lbl">토</div>
           </div>
           <div class="cal-grid" id="cg"></div>
-          <div class="cal-done-row">
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#F4A0B5"/></svg>
-            <div class="cal-done-num"><span id="ddn">0</span>일</div>
+          <div class="cal-done-row" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#F4A0B5"/></svg>
+              <div class="cal-done-num"><span id="ddn">0</span>일</div>
+            </div>
+            <button onclick="openYearReview()" style="font-size:11px;color:#E05A7A;background:none;border:1.5px solid #FFB3C6;border-radius:20px;padding:2px 10px;cursor:pointer;font-weight:700;">📊 1년 돌아보기</button>
           </div>
         </div>
       </div>
@@ -449,7 +452,7 @@ function defaultState(){
   ],cal:{},yr:new Date().getFullYear(),mo:new Date().getMonth(),
   passDay:false,lastDate:null,weekKey:null,
   weeklyByDay:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]},
-  optGoal:{},optWeekCount:{},optWeekKey:null,optPickedDate:{},calLog:{}};
+  optGoal:{},optWeekCount:{},optWeekKey:null,optPickedDate:{},calLog:{},monthlySummary:{}};
 }
 
 // Supabase에서 데이터 로드
@@ -491,6 +494,77 @@ function save(){
   saveTimer = setTimeout(saveToSupabase, 1000);
 }
 
+// ── 일별 백업: calLog 전체를 별도 키로 Supabase에 저장 ──
+async function saveDailyBackup(){
+  try{
+    const backupId = 'jian_backup';
+    const backupData = {
+      calLog: S.calLog||{},
+      cal: S.cal||{},
+      savedAt: new Date().toISOString()
+    };
+    await fetch(`${SUPABASE_URL}/rest/v1/jian_todo`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_KEY,
+        'Authorization':`Bearer ${SUPABASE_KEY}`,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify({user_id:backupId, data:backupData, updated_at:new Date().toISOString()})
+    });
+    console.log('✅ 일별 백업 완료');
+  }catch(e){console.error('백업 실패:',e);}
+}
+
+// ── 월별 요약 저장 ──
+async function saveMonthSummary(yr, mo){
+  try{
+    const days = Object.keys(S.cal).filter(k=>{
+      const [y,m] = k.split('-');
+      return parseInt(y)===yr && parseInt(m)===(mo+1);
+    });
+    if(!days.length) return;
+    const pcts = days.map(k=>S.cal[k]||0);
+    const perfect = days.filter(k=>(S.cal[k]||0)>=100).length;
+    const avg = Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length);
+    // 항목별 완료 횟수 집계
+    const itemCount = {};
+    days.forEach(k=>{
+      const log = S.calLog[k];
+      if(!log) return;
+      [...(log.daily||[]),...(log.optional||[]),...(log.weekly||[])].forEach(t=>{
+        if(t.done) itemCount[t.text]=(itemCount[t.text]||0)+1;
+      });
+    });
+    const topItem = Object.entries(itemCount).sort((a,b)=>b[1]-a[1])[0];
+    const summary = {
+      yr, mo: mo+1,
+      totalDays: days.length,
+      perfectDays: perfect,
+      avgPct: avg,
+      topItem: topItem?{text:topItem[0],count:topItem[1]}:null,
+      itemCount,
+      savedAt: new Date().toISOString()
+    };
+    const summaryId = `jian_summary_${yr}_${mo+1}`;
+    await fetch(`${SUPABASE_URL}/rest/v1/jian_todo`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_KEY,
+        'Authorization':`Bearer ${SUPABASE_KEY}`,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify({user_id:summaryId, data:summary, updated_at:new Date().toISOString()})
+    });
+    // S에도 저장
+    if(!S.monthlySummary) S.monthlySummary={};
+    S.monthlySummary[`${yr}-${mo+1}`]=summary;
+    console.log(`✅ ${yr}년 ${mo+1}월 요약 저장 완료`);
+  }catch(e){console.error('월별 요약 저장 실패:',e);}
+}
+
 let S = defaultState();
 
 // 초기화는 initApp()에서 처리
@@ -514,6 +588,14 @@ function checkDayReset(){
   const t=tKey();
   const wk=getMonWeekKey();
   if(S.lastDate&&S.lastDate!==t){
+    // 날짜 바뀌기 전 백업 저장
+    saveDailyBackup();
+    // 전날이 월 마지막 날이었으면 월별 요약 저장
+    if(S.lastDate){
+      const [ly,lm,ld]=S.lastDate.split('-').map(Number);
+      const lastDay=new Date(ly,lm,0).getDate(); // 해당 월 마지막 날
+      if(ld===lastDay) saveMonthSummary(ly,lm-1);
+    }
     S.todos.forEach(x=>{if(x.type==='daily')x.done=false;});
     S.passDay=false;
     for(let i=0;i<7;i++){(S.weeklyByDay[i]||[]).forEach(x=>x.done=false);}
@@ -722,6 +804,7 @@ function toggle(id){
       const key=String(t.id);
       const today=tKey();
       if(!S.optPickedDate) S.optPickedDate={};
+  if(!S.monthlySummary) S.monthlySummary={};
       if(S.optPickedDate[key]!==today){
         if(!S.optWeekCount[key])S.optWeekCount[key]=0;
         S.optWeekCount[key]++;
@@ -732,6 +815,7 @@ function toggle(id){
       const key=String(t.id);
       const today=tKey();
       if(!S.optPickedDate) S.optPickedDate={};
+  if(!S.monthlySummary) S.monthlySummary={};
       if(S.optPickedDate[key]===today){
         if(S.optWeekCount[key]>0)S.optWeekCount[key]--;
         delete S.optPickedDate[key];
@@ -1378,7 +1462,73 @@ function initFields(){
   if(!S.optWeekCount) S.optWeekCount={};
   if(!S.optWeekKey) S.optWeekKey=null;
   if(!S.optPickedDate) S.optPickedDate={};
+  if(!S.monthlySummary) S.monthlySummary={};
   if(!S.cal) S.cal={};
+}
+
+// ── 1년 돌아보기 팝업 ──
+function openYearReview(){
+  const yr = new Date().getFullYear();
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  let html = `<div id="year-overlay" onclick="if(event.target===this)closeYearReview()" style="position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9999;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:20px;padding:24px;width:min(560px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span style="font-size:18px;font-weight:800;color:#E05A7A;">${yr}년 돌아보기</span>
+        <button onclick="closeYearReview()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;">✕</button>
+      </div>`;
+
+  // 월별 요약 테이블
+  let totalPerfect=0, totalDays=0, allItems={};
+  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">`;
+  for(let m=0;m<12;m++){
+    const key=`${yr}-${m+1}`;
+    const s = S.monthlySummary&&S.monthlySummary[key];
+    // monthlySummary 없으면 cal에서 직접 계산
+    let pd=0,td=0,avg=0,top=null,iCount={};
+    if(s){
+      pd=s.perfectDays||0;td=s.totalDays||0;avg=s.avgPct||0;top=s.topItem;iCount=s.itemCount||{};
+    } else {
+      const days=Object.keys(S.cal).filter(k=>{const[y,mo]=k.split('-');return parseInt(y)===yr&&parseInt(mo)===(m+1);});
+      td=days.length;
+      if(td){
+        const pcts=days.map(k=>S.cal[k]||0);
+        avg=Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length);
+        pd=days.filter(k=>(S.cal[k]||0)>=100).length;
+        days.forEach(k=>{const log=S.calLog[k];if(!log)return;[...(log.daily||[]),...(log.optional||[]),...(log.weekly||[])].forEach(t=>{if(t.done)iCount[t.text]=(iCount[t.text]||0)+1;});});
+        const te=Object.entries(iCount).sort((a,b)=>b[1]-a[1])[0];
+        if(te)top={text:te[0],count:te[1]};
+      }
+    }
+    totalPerfect+=pd;totalDays+=td;
+    Object.entries(iCount).forEach(([k,v])=>{allItems[k]=(allItems[k]||0)+v;});
+    const future=td===0&&(yr>new Date().getFullYear()||(yr===new Date().getFullYear()&&m>new Date().getMonth()));
+    const color=avg>=80?'#E05A7A':avg>=50?'#F4A0B5':'#ddd';
+    html+=`<div style="border-radius:12px;padding:12px;background:#FFF5F8;border:1.5px solid ${td?color:'#eee'};">
+      <div style="font-weight:800;font-size:13px;color:#E05A7A;margin-bottom:4px;">${months[m]}</div>
+      ${future?'<div style="font-size:11px;color:#ccc;">아직이에요 🌱</div>':
+        td===0?'<div style="font-size:11px;color:#ccc;">기록 없음</div>':`
+        <div style="font-size:11px;color:#888;">완료율 <b style="color:#E05A7A;">${avg}%</b></div>
+        <div style="font-size:11px;color:#888;">개근 <b style="color:#E05A7A;">${pd}일</b> / ${td}일</div>
+        ${top?`<div style="font-size:10px;color:#aaa;margin-top:2px;">✨ ${top.text} ${top.count}회</div>`:''}`}
+    </div>`;
+  }
+  html+=`</div>`;
+
+  // 연간 통계
+  if(totalDays>0){
+    const topYear=Object.entries(allItems).sort((a,b)=>b[1]-a[1])[0];
+    html+=`<div style="background:#FFF0F5;border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="font-weight:800;color:#E05A7A;margin-bottom:8px;">✨ ${yr}년 총합</div>
+      <div style="font-size:13px;color:#666;">개근일 <b style="color:#E05A7A;">${totalPerfect}일</b> / 기록된 ${totalDays}일</div>
+      ${topYear?`<div style="font-size:13px;color:#666;margin-top:4px;">가장 많이 한 것 <b style="color:#E05A7A;">${topYear[0]}</b> (${topYear[1]}회)</div>`:''}
+    </div>`;
+  }
+  html+=`</div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function closeYearReview(){
+  const el=document.getElementById('year-overlay');
+  if(el)el.remove();
 }
 
 async function initApp(){
